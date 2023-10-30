@@ -64,15 +64,13 @@ if __name__ == "__main__":
     combinations_list = combinations(nodes_to_quantize, k)
     
     config_list = []
-    limit = 10
+    limit = 1000
     
     i = 0
     while i < limit:
         config_list.append(list(next(combinations_list)))
         
         i+=1
-    
-    pbar2 = tqdm(total=len(config_list), desc=f"Generate permutation k={k}")
     
     config_path = os.path.join(config_dir, f"{model_name}_{quantized_ratio}.pkl")
     

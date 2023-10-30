@@ -1,4 +1,3 @@
-import os
 import torch
 import torchvision as tv
 import onnxruntime
@@ -7,6 +6,7 @@ import random
 
 from tqdm import tqdm
 from torch.utils.data import DataLoader
+from common import MEAN, STD
 
 
 def seed_worker(worker_id):
@@ -28,24 +28,14 @@ def accuracy(true_labels, predicted_labels):
     return accuracy
 
 
-def evaluate(data_path, model_path, batch_size=1):
-    g = torch.Generator()
-    g.manual_seed(0)
+def evaluate(test_set, model_path, batch_size=1):
 
-    transform = tv.transforms.Compose(
-        [tv.transforms.ToTensor(),
-         tv.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2471, 0.2435, 0.2616))]
-    )
+    g = torch.Generator()
+    g.manual_seed(2147483647)
+
+    test_loader = DataLoader(test_set, batch_size=batch_size, shuffle=True, drop_last=True, worker_init_fn=seed_worker, generator=g)
     
-    dataset = tv.datasets.CIFAR10(
-        root=data_path,
-        train=False,
-        download=False,
-        transform=transform,
-    )
-    
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, drop_last=True, worker_init_fn=seed_worker, generator=g)
-    pbar = tqdm(total=len(dataset))
+    pbar = tqdm(total=len(test_loader))
 
     ort_inputs = {}
     true_labels = []
@@ -68,7 +58,7 @@ def evaluate(data_path, model_path, batch_size=1):
     # print(f"Output name: {output_name}, Output shape: {output_shape}")
 
     
-    for inputs, labels in dataloader:
+    for inputs, labels in test_loader:
         try:
             inp_list = [inp.numpy() for inp in inputs]
             inps = np.stack(inp_list, axis=0)
@@ -84,6 +74,7 @@ def evaluate(data_path, model_path, batch_size=1):
                 true_labels.append(true_label)
                 predicted_labels.append(pred_label)
 
+            pbar.update(1)
         except Exception as e:
             print(e)
             continue
@@ -92,6 +83,8 @@ def evaluate(data_path, model_path, batch_size=1):
 
     acc = accuracy(true_labels, predicted_labels)
 
+    del sess
+
     return acc
 
 
@@ -99,12 +92,33 @@ if __name__ == "__main__":
     import os
     import onnx
     
-    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-
+    # os.environ["CUDA_VISIBLE_DEVICES"] = "0"
     
     data_path = "/media/data/hoangnt/Projects/Datasets"
-    fp32_model_path = "weights/0_resnet50_cifar10_qop_quant.onnx"
-    fp32_model = onnx.load(fp32_model_path)
-    fp32_acc = evaluate(data_path, fp32_model_path)
+    int8_model_path = "pretrained/efficientnetv2_rw_t_quant_0.onnx"
+    int8_model = onnx.load(int8_model_path)
+    batch_size = 1024
+
+    transform = tv.transforms.Compose(
+        [tv.transforms.ToTensor(),
+         tv.transforms.Normalize(MEAN, STD)]
+    )
     
-    print(fp32_acc)
+    dataset = tv.datasets.CIFAR10(
+        root=data_path,
+        train=False,
+        download=False,
+        transform=transform,
+    )
+
+    i = 0
+    while (i < 2):
+
+        g = torch.Generator()
+        g.manual_seed(2147483647)
+        
+        int8_acc = evaluate(dataset, int8_model_path, batch_size)
+    
+        print(int8_acc)
+
+        i += 1

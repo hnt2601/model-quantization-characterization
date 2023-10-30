@@ -1,20 +1,19 @@
 import torch
 import time
-import openpyxl
 import numpy as np
 import onnxruntime
-import typing
-import os
 
 from memory_profiler import profile
+from openpyxl.utils import column_index_from_string
+from openpyxl.styles import Alignment
 
 
 #@profile
-def benchmark(model_path, batch_size=1, use_gpu=True):
+def benchmark(model_path, batch_size=1, use_gpu=True, is_profile=False):
     # Create an ONNX Runtime session with GPU as the execution provider
     options = onnxruntime.SessionOptions()
     options.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
-    options.enable_profiling = True
+    options.enable_profiling = True if is_profile else False
 
     providers = ["CPUExecutionProvider"]
     if use_gpu and torch.cuda.is_available():
@@ -163,65 +162,55 @@ def benchmark(model_path, batch_size=1, use_gpu=True):
 #     return latency
 
 
-# def save_subgraphs_to_excel(model_path, subgraphs):
-#     model_name = model_path.stem
-#     # Create an Excel workbook if it doesn't exist
-#     excel_file_path = subgraph_folder_path / "model_subgraphs.xlsx"
-#     if not excel_file_path.exists():
-#         workbook = openpyxl.Workbook()
-#     else:
-#         workbook = openpyxl.load_workbook(excel_file_path)
-#         if "Sheet" in workbook.sheetnames:
-#             workbook.remove(workbook["Sheet"])
+def extract_analytic_to_excel(workbook, data, title):
+    worksheet = workbook.create_sheet(title=f"{title}%_quantized_layers")
+    alignment = Alignment(horizontal='center', vertical='center')
 
-#     # Check if the model sheet already exists
-#     if model_name in workbook.sheetnames:
-#         workbook.remove(workbook[model_name])
+    # Add headers to the sheet
+    worksheet["A1"] = "Configuration Index"
+    worksheet.merge_cells('A1:A2')
 
-#     worksheet = workbook.create_sheet(title=model_name)
+    worksheet["B1"] = ""
+    worksheet["C1"] = ""
+    worksheet.merge_cells('B1:C1')
+    worksheet["B1"] = "Latency (s)"
+    worksheet["B2"] = "FP32 Latency (s)"
+    worksheet["C2"] = "INT8 Latency (s)"
 
-#     # Add headers to the sheet
-#     worksheet["A1"] = "Subgraph"
-#     worksheet["B1"] = "Length"
-#     worksheet["C1"] = "Start Node"
-#     worksheet["D1"] = "Nodes"
-#     worksheet["E1"] = "Names"
+    worksheet["D1"] = "Latency Reduction (s)"
+    worksheet.merge_cells('D1:D2')
 
-#     # Iterate over the subgraphs and add them to the sheet
-#     row_index = 2
-#     subgraph_number = 0
-#     for subgraph_set in subgraphs:
-#         for subgraph in subgraph_set:
-#             nodes = subgraph.nodes()
-#             start_node_index = subgraph.indices[0]
+    worksheet["E1"] = "Ratio Latency Reduction (%)"
+    worksheet.merge_cells('E1:E2')
 
-#             worksheet.cell(
-#                 row=row_index,
-#                 column=1,
-#                 value=f"{model_name}_subgraph_{subgraph_number}",
-#             )
-#             worksheet.cell(row=row_index, column=2, value=len(subgraph.nodes()))
-#             worksheet.cell(row=row_index, column=3, value=start_node_index)
+    worksheet["F1"] = ""
+    worksheet["G1"] = ""
+    worksheet.merge_cells('F1:G1')
+    worksheet["F1"] = "Accuracy (%)"
+    worksheet["F2"] = "FP32 Accuracy (%)"
+    worksheet["G2"] = "INT8 Accuracy (%)"
 
-#             subgraph_nodes = ""
-#             subgraph_names = ""
+    worksheet["H1"] = "Accuracy Loss (%)"
+    worksheet.merge_cells('H1:H2')
 
-#             for j, node in enumerate(nodes):
-#                 subgraph_nodes += str(node.op_type)
-#                 subgraph_names += str(node.name)
+    worksheet["I1"] = "Ratio Accuracy Loss (%)"
+    worksheet.merge_cells('I1:I2')
 
-#                 if j < len(nodes) - 1:
-#                     subgraph_nodes += " _ "
-#                     subgraph_names += " _ "
+    row_index = 3
 
-#             worksheet.cell(row=row_index, column=4, value=subgraph_nodes)
-#             worksheet.cell(row=row_index, column=5, value=subgraph_names)
+    for i, d in enumerate(data):
+        worksheet.cell(row=row_index, column=column_index_from_string('A'), value=str(i))
+        worksheet.cell(row=row_index, column=column_index_from_string('B'), value=d["latency"]["FP32"])
+        worksheet.cell(row=row_index, column=column_index_from_string('C'), value=d["latency"]["INT8"])
+        worksheet.cell(row=row_index, column=column_index_from_string('D'), value=d["latency_redution"])
+        worksheet.cell(row=row_index, column=column_index_from_string('E'), value=d["ratio_latency_redution"])
+        worksheet.cell(row=row_index, column=column_index_from_string('F'), value=d["accuracy"]["FP32"])
+        worksheet.cell(row=row_index, column=column_index_from_string('G'), value=d["accuracy"]["INT8"])
+        worksheet.cell(row=row_index, column=column_index_from_string('H'), value=d["accuracy_loss"])
+        worksheet.cell(row=row_index, column=column_index_from_string('I'), value=d["ratio_accuracy_loss"])
 
-#             row_index += 1
-#             subgraph_number += 1
+        row_index += 1
 
-#             # if start_node in pattern:
-
-#     # Save the workbook
-#     workbook.save(excel_file_path)
-#     print(f"All subgraphs saved as: {excel_file_path}")
+    for row in worksheet.iter_rows(min_row=1, max_row=row_index, min_col=1, max_col=10):
+        for cell in row:
+            cell.alignment = alignment

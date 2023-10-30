@@ -1,11 +1,9 @@
 import argparse
-import json
 import torch
 import random
 import torchvision as tv
 import openpyxl
 import shutil
-import numpy as np
 import pickle
 
 from model_evaluate import evaluate
@@ -17,27 +15,8 @@ from onnxruntime.quantization import (
 )
 from torch.utils.data import DataLoader
 from data import vision_data_reader
-from utils import benchmark
-
-
-def extract_analytic_to_excel(workbook, data, title):
-    worksheet = workbook.create_sheet(title=title)
-
-    # Add headers to the sheet
-    worksheet["A1"] = "Metric"
-    worksheet["B1"] = "FP32"
-    worksheet["C1"] = "INT8"
-
-    row_index = 2
-
-    for metric, perf in data.items():
-        worksheet.cell(row=row_index, column=1, value=metric)
-
-        worksheet.cell(row=row_index, column=2, value=perf["FP32"])
-
-        worksheet.cell(row=row_index, column=3, value=perf["INT8"])
-
-        row_index += 1
+from utils import benchmark, extract_analytic_to_excel
+from common import MEAN, STD
 
 
 def get_args():
@@ -76,7 +55,7 @@ def get_args():
     parser.add_argument(
         '--batch_size',
         type=int,
-        default=256
+        default=1024
     )
 
     parser.add_argument("--profiling", action="store_true", default=False, help="")
@@ -89,25 +68,20 @@ def get_args():
 def main():
     args = get_args()
     
-    workbook = openpyxl.Workbook()
-    
-    fp32_model_path = args.input_model
-    fp32_prof_file = fp32_model_path.replace("onnx", "json")
-    
-    print("benchmarking fp32 model...")
-    fp32_latency, prof_file = benchmark(fp32_model_path, args.batch_size)
-    fp32_latency /= args.batch_size
+    data_list = []
 
-    if args.profiling:
-        shutil.move(prof_file, fp32_prof_file)
-    
-    fp32_acc = evaluate(args.data_path, fp32_model_path, args.batch_size)
-    # print(f"Avg: {fp32_latency:.2f}ms")
-    
-    mean, std = (0.4914, 0.4822, 0.4465), (0.2471, 0.2435, 0.2616)
-    
+    workbook = openpyxl.Workbook()
+
+
     transform = tv.transforms.Compose(
-        [tv.transforms.ToTensor(), tv.transforms.Normalize(mean, std)]
+        [tv.transforms.ToTensor(), tv.transforms.Normalize(MEAN, STD)]
+    )
+
+    train_set = tv.datasets.CIFAR10(
+        root=args.data_path,
+        train=True,
+        download=False,
+        transform=transform,
     )
 
     test_set = tv.datasets.CIFAR10(
@@ -117,11 +91,24 @@ def main():
         transform=transform,
     )
     
-    nb_sample_to_calib = 1000
-    random.shuffle(test_set.targets)
-    filtered_indices = test_set.targets[:nb_sample_to_calib]
-    calib_set = torch.utils.data.Subset(test_set, filtered_indices)
+    nb_sample_to_calib = 2000
+    random.shuffle(train_set.targets)
+    filtered_indices = train_set.targets[:nb_sample_to_calib]
+    calib_set = torch.utils.data.Subset(train_set, filtered_indices)
     calib_loader = DataLoader(calib_set, batch_size=args.batch_size, shuffle=False, drop_last=True)
+    
+    print("benchmarking fp32 model...")
+
+    fp32_model_path = args.input_model
+    fp32_latency, prof_file = benchmark(fp32_model_path, batch_size=args.batch_size, use_gpu=True, is_profile=args.profiling)
+    fp32_latency /= args.batch_size
+    fp32_prof_file = fp32_model_path.replace("onnx", "json")
+
+    if args.profiling:
+        shutil.move(prof_file, fp32_prof_file)
+    
+    fp32_acc = evaluate(test_set, fp32_model_path, args.batch_size)
+    # print(f"Avg: {fp32_latency:.2f}ms")
     
     with open(args.config_path, 'rb') as pickle_load:
         quantize_config = pickle.load(pickle_load)
@@ -167,24 +154,28 @@ def main():
 
         print("benchmarking int8 model...")
     
-        int8_latency, prof_file = benchmark(int8_model_path)
+        int8_latency, prof_file = benchmark(int8_model_path, batch_size=args.batch_size, use_gpu=True, is_profile=args.profiling)
         int8_latency /= args.batch_size
         
         if args.profiling:
             shutil.move(prof_file, int8_prof_file)
         
-        int8_acc = evaluate(args.data_path, int8_model_path, args.batch_size)
+        int8_acc = evaluate(test_set, int8_model_path, args.batch_size)
         # print(f"Avg: {int8_latency:.2f}ms")
         
         data = {
-            "Ratio Quantized Layer (%)": {"FP32": 0, "INT8": ratio_quantized},
-            "Latency (s)": {"FP32": round(fp32_latency, 2), "INT8": round(int8_latency, 2)},
-            "Latency Drop (%)": {"FP32": 0.0, "INT8": round(fp32_latency / int8_latency, 2)},
-            "Accuracy": {"FP32": round(fp32_acc, 4), "INT8": round(int8_acc, 4)},
-            "Accuracy Loss (%)": {"FP32": 0.0, "INT8": round(fp32_acc / int8_acc, 4)},
+            "ratio_quantized_layer": ratio_quantized,
+            "latency": {"FP32": round(fp32_latency, 2), "INT8": round(int8_latency, 2)},
+            "latency_redution":round(fp32_latency - int8_latency, 2),
+            "ratio_latency_redution": round((fp32_latency - int8_latency) / int8_latency, 2),
+            "accuracy": {"FP32": round(fp32_acc, 4), "INT8": round(int8_acc, 4)},
+            "accuracy_loss": round(fp32_acc - int8_acc, 4),
+            "ratio_accuracy_loss": round(((fp32_acc - int8_acc) / int8_acc)*100, 4),
         }
 
-        extract_analytic_to_excel(workbook, data, str(i))
+        data_list.append(data)
+
+    extract_analytic_to_excel(workbook, data_list, ratio_quantized)
 
     workbook.save(args.report_path)
 
