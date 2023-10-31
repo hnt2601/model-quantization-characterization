@@ -12,7 +12,7 @@ def _preprocess_images(data_loader, height: int, width: int, size_limit=0):
     parameter size_limit: number of images to load. Default is 0 which means all images are picked.
     return: list of matrices characterizing multiple images
     """
-   
+
     unconcatenated_batch_data = []
 
     for data in data_loader:
@@ -21,7 +21,7 @@ def _preprocess_images(data_loader, height: int, width: int, size_limit=0):
             unconcatenated_batch_data.append(nchw_data)
         except:
             continue
-        
+
     batch_data = np.concatenate(
         np.expand_dims(unconcatenated_batch_data, axis=0), axis=0
     )

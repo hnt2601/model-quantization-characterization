@@ -32,10 +32,10 @@ if __name__ == "__main__":
 
     onnx_model = onnx.load(args.onnx_path)
     model_name = Path(args.onnx_path).stem
-    
+
     initializers = [init.name for init in onnx_model.graph.initializer]
     nodes = onnx_model.graph.node
-    
+
     nodes_to_quantize = []
 
     pbar = tqdm(total=len(nodes), desc="Generate list node name of layers")
@@ -52,29 +52,29 @@ if __name__ == "__main__":
             continue
 
     pbar.close()
-    
+
     config_dir = f"configs/{model_name}"
     os.makedirs(config_dir, exist_ok=True)
 
-    k = int(len(nodes_to_quantize) * (1-args.dropout))
-    quantized_ratio = int((k/len(nodes_to_quantize))*100)
-    
+    k = int(len(nodes_to_quantize) * (1 - args.dropout))
+    quantized_ratio = int((k / len(nodes_to_quantize)) * 100)
+
     print(len(nodes_to_quantize), k, quantized_ratio)
-    
+
     combinations_list = combinations(nodes_to_quantize, k)
-    
+
     config_list = []
     limit = 1000
-    
+
     i = 0
     while i < limit:
         config_list.append(list(next(combinations_list)))
-        
-        i+=1
-    
+
+        i += 1
+
     config_path = os.path.join(config_dir, f"{model_name}_{quantized_ratio}.pkl")
-    
-    with open(config_path, 'wb') as pickle_file:
+
+    with open(config_path, "wb") as pickle_file:
         pickle.dump(config_list, pickle_file, protocol=pickle.HIGHEST_PROTOCOL)
-        
+
         print(f"Saved configure to {config_path} with {len(config_list)} scenarios")

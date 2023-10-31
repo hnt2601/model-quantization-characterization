@@ -13,10 +13,20 @@ import timm
 import os
 
 
-device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
-classes = ('plane', 'car', 'bird', 'cat',
-           'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
+classes = (
+    "plane",
+    "car",
+    "bird",
+    "cat",
+    "deer",
+    "dog",
+    "frog",
+    "horse",
+    "ship",
+    "truck",
+)
 
 data_path = "/media/data/hoangnt/Projects/Datasets"
 
@@ -25,32 +35,48 @@ std = (0.2023, 0.1994, 0.2010)
 
 batch_size = 256
 
-transform_train = transforms.Compose([
-    transforms.RandomCrop(32, padding=4),
-    transforms.RandomHorizontalFlip(),
-    transforms.ToTensor(),
-    transforms.Normalize(mean, std),
-])
+transform_train = transforms.Compose(
+    [
+        transforms.RandomCrop(32, padding=4),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        transforms.Normalize(mean, std),
+    ]
+)
 
-transform_test = transforms.Compose([
-    transforms.ToTensor(),
-    transforms.Normalize(mean, std),
-])
+transform_test = transforms.Compose(
+    [
+        transforms.ToTensor(),
+        transforms.Normalize(mean, std),
+    ]
+)
 
 
-trainset = datasets.CIFAR10(root=data_path, train=False,
-                                        download=False, transform=transform_train)
-train_loader = torch.utils.data.DataLoader(trainset, batch_size=batch_size,
-                                          shuffle=True, num_workers=os.cpu_count(), pin_memory=True)
+trainset = datasets.CIFAR10(
+    root=data_path, train=False, download=False, transform=transform_train
+)
+train_loader = torch.utils.data.DataLoader(
+    trainset,
+    batch_size=batch_size,
+    shuffle=True,
+    num_workers=os.cpu_count(),
+    pin_memory=True,
+)
 
-testset = datasets.CIFAR10(root=data_path, train=False,
-                                       download=False, transform=transform_test)
-test_loader = torch.utils.data.DataLoader(testset, batch_size=batch_size,
-                                         shuffle=False, num_workers=os.cpu_count(), pin_memory=True)
+testset = datasets.CIFAR10(
+    root=data_path, train=False, download=False, transform=transform_test
+)
+test_loader = torch.utils.data.DataLoader(
+    testset,
+    batch_size=batch_size,
+    shuffle=False,
+    num_workers=os.cpu_count(),
+    pin_memory=True,
+)
 
 
 # Define a Network
-#model = MobileNetV2(class_num=len(classes), pretrained=True)
+# model = MobileNetV2(class_num=len(classes), pretrained=True)
 # model = EfficientnetV2(class_num=len(classes), pretrained=True)
 model = ResNet50(class_num=len(classes), pretrained=True)
 model.to(device)
@@ -77,13 +103,19 @@ def train_step(epoch, loss_train_epoch):
         epoch_loss.append(loss.item())
         loss.backward()
         optimizer.step()
-        loop.set_postfix({'Iter': '[{}/{}]'.format(batch_idx * len(data), len(train_loader.dataset)),
-                          'Epoch_Loss': sum(epoch_loss)/len(epoch_loss),
-                          'Batch_Loss': loss.item()
-                           })
-    loss_train_epoch.append(sum(epoch_loss)/len(epoch_loss))
+        loop.set_postfix(
+            {
+                "Iter": "[{}/{}]".format(
+                    batch_idx * len(data), len(train_loader.dataset)
+                ),
+                "Epoch_Loss": sum(epoch_loss) / len(epoch_loss),
+                "Batch_Loss": loss.item(),
+            }
+        )
+    loss_train_epoch.append(sum(epoch_loss) / len(epoch_loss))
 
     return loss_train_epoch
+
 
 def test(best_auc, loss_test_epoch, epoch_auc_history):
     model.eval()
@@ -97,19 +129,24 @@ def test(best_auc, loss_test_epoch, epoch_auc_history):
             pred = output.argmax(dim=1, keepdim=True)
             correct += pred.eq(target.view_as(pred)).sum().item()
 
-    test_loss = sum(test_loss_list)/len(test_loss_list)
+    test_loss = sum(test_loss_list) / len(test_loss_list)
     loss_test_epoch.append(test_loss)
     epoch_auc_history.append(correct / 100)
-    
+
     if correct > best_auc:
         best_auc = correct
-        torch.save(model.state_dict(), f'pretrained/{model.name}.pth')
+        torch.save(model.state_dict(), f"pretrained/{model.name}.pth")
 
-    print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
-        test_loss, correct, len(test_loader.dataset),
-        100. * correct / len(test_loader.dataset)))
+    print(
+        "\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n".format(
+            test_loss,
+            correct,
+            len(test_loader.dataset),
+            100.0 * correct / len(test_loader.dataset),
+        )
+    )
 
-    print('Best Accuracy :', best_auc)
+    print("Best Accuracy :", best_auc)
 
     return best_auc, loss_test_epoch, epoch_auc_history
 
@@ -126,12 +163,11 @@ early_stopper = EarlyStopper(patience=3, min_delta=10)
 
 for epoch in range(1, epoches):
     loss_train_epoch = train_step(epoch, loss_train_epoch)
-    best_auc, loss_test_epoch, epoch_auc_history = test(best_auc, loss_test_epoch, epoch_auc_history)
+    best_auc, loss_test_epoch, epoch_auc_history = test(
+        best_auc, loss_test_epoch, epoch_auc_history
+    )
 
     if early_stopper.early_stop(loss_test_epoch[-1]):
         break
-    
+
     scheduler.step()
-
-
-

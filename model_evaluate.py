@@ -29,12 +29,18 @@ def accuracy(true_labels, predicted_labels):
 
 
 def evaluate(test_set, model_path, batch_size=1):
-
     g = torch.Generator()
     g.manual_seed(2147483647)
 
-    test_loader = DataLoader(test_set, batch_size=batch_size, shuffle=True, drop_last=True, worker_init_fn=seed_worker, generator=g)
-    
+    test_loader = DataLoader(
+        test_set,
+        batch_size=batch_size,
+        shuffle=True,
+        drop_last=True,
+        worker_init_fn=seed_worker,
+        generator=g,
+    )
+
     pbar = tqdm(total=len(test_loader))
 
     ort_inputs = {}
@@ -46,7 +52,9 @@ def evaluate(test_set, model_path, batch_size=1):
     options.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
     # options.log_severity_level = 3  # Set log verbosity to see GPU provider details
     sess = onnxruntime.InferenceSession(
-        model_path, providers=["CUDAExecutionProvider", "CPUExecutionProvider"], sess_options=options
+        model_path,
+        providers=["CUDAExecutionProvider", "CPUExecutionProvider"],
+        sess_options=options,
     )
 
     # Check the input and output names and shapes of the model
@@ -57,7 +65,6 @@ def evaluate(test_set, model_path, batch_size=1):
     # print(f"Input name: {input_name}, Input shape: {input_shape}")
     # print(f"Output name: {output_name}, Output shape: {output_shape}")
 
-    
     for inputs, labels in test_loader:
         try:
             inp_list = [inp.numpy() for inp in inputs]
@@ -91,19 +98,18 @@ def evaluate(test_set, model_path, batch_size=1):
 if __name__ == "__main__":
     import os
     import onnx
-    
+
     # os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-    
+
     data_path = "/media/data/hoangnt/Projects/Datasets"
     int8_model_path = "pretrained/efficientnetv2_rw_t_quant_0.onnx"
     int8_model = onnx.load(int8_model_path)
     batch_size = 1024
 
     transform = tv.transforms.Compose(
-        [tv.transforms.ToTensor(),
-         tv.transforms.Normalize(MEAN, STD)]
+        [tv.transforms.ToTensor(), tv.transforms.Normalize(MEAN, STD)]
     )
-    
+
     dataset = tv.datasets.CIFAR10(
         root=data_path,
         train=False,
@@ -112,13 +118,12 @@ if __name__ == "__main__":
     )
 
     i = 0
-    while (i < 2):
-
+    while i < 2:
         g = torch.Generator()
         g.manual_seed(2147483647)
-        
+
         int8_acc = evaluate(dataset, int8_model_path, batch_size)
-    
+
         print(int8_acc)
 
         i += 1

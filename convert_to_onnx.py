@@ -22,8 +22,10 @@ def get_args():
         type=str,
         default="./pretrained/model.pt",
     )
-    
-    parser.add_argument('--backbone', choices=['resnet50', 'mobilenet_v2', 'efficientnetv2'])
+
+    parser.add_argument(
+        "--backbone", choices=["resnet50", "mobilenet_v2", "efficientnetv2"]
+    )
 
     args = parser.parse_args()
 
@@ -32,7 +34,7 @@ def get_args():
 
 if __name__ == "__main__":
     args = get_args()
-    
+
     model_dict = {
         "resnet50": ResNet50(),
         "mobilenet_v2": MobileNetV2(),
@@ -44,18 +46,18 @@ if __name__ == "__main__":
     model.eval()
 
     print("Finished loading model!")
-    
+
     # Export to ONNX
     input_names = ["input1"]
     output_names = ["output0"]
     input_shapes = {input_names[0]: [1, 3, *args.input_size]}
     onnx_bytes = io.BytesIO()
     zero_input = torch.zeros(*input_shapes[input_names[0]])
-    
+
     dynamic_axes = {input_names[0]: {0: "batch"}}
     for _, name in enumerate(output_names):
         dynamic_axes[name] = dynamic_axes[input_names[0]]
-        
+
     extra_args = {
         "opset_version": 13,
         "verbose": False,
@@ -63,11 +65,11 @@ if __name__ == "__main__":
         "output_names": output_names,
         "dynamic_axes": dynamic_axes,
         "do_constant_folding": False,
-        "export_params": True
+        "export_params": True,
     }
-    
-    onnx_path = args.pretrained.replace('.pth', '.onnx')
-    
+
+    onnx_path = args.pretrained.replace(".pth", ".onnx")
+
     torch.onnx.export(model, zero_input, onnx_bytes, **extra_args)
     with open(onnx_path, "wb") as out:
         out.write(onnx_bytes.getvalue())
@@ -76,5 +78,5 @@ if __name__ == "__main__":
     inferred_model = onnx.shape_inference.infer_shapes(onnx_model)
     # print(onnx.helper.printable_graph(inferred_model.graph))
     onnx.save(inferred_model, onnx_path)
-    
+
     print("Generated onnx model named {}".format(onnx_path))
