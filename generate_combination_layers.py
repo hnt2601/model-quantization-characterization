@@ -18,7 +18,7 @@ def get_args():
     )
     parser.add_argument(
         "--dropout",
-        type=int,
+        type=float,
         default=0.1,
     )
 

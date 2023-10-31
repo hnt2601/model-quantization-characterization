@@ -5,6 +5,7 @@ import torchvision as tv
 import openpyxl
 import shutil
 import pickle
+import os
 
 from model_evaluate import evaluate
 from onnxruntime.quantization import (
@@ -70,8 +71,10 @@ def main():
     
     data_list = []
 
-    workbook = openpyxl.Workbook()
-
+    if not os.path.exists(args.report_path):
+        workbook = openpyxl.Workbook()
+    else:
+        workbook = openpyxl.load_workbook(args.report_path)
 
     transform = tv.transforms.Compose(
         [tv.transforms.ToTensor(), tv.transforms.Normalize(MEAN, STD)]
