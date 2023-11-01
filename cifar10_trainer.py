@@ -76,9 +76,9 @@ test_loader = torch.utils.data.DataLoader(
 
 
 # Define a Network
-# model = MobileNetV2(class_num=len(classes), pretrained=True)
+model = MobileNetV2(class_num=len(classes), pretrained=True)
 # model = EfficientnetV2(class_num=len(classes), pretrained=True)
-model = ResNet50(class_num=len(classes), pretrained=True)
+#model = ResNet50(class_num=len(classes), pretrained=True)
 model.to(device)
 
 # Training Hyperparameters

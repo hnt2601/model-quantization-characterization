@@ -173,11 +173,11 @@ def main():
             "latency": {"FP32": round(fp32_latency, 2), "INT8": round(int8_latency, 2)},
             "latency_redution": round(fp32_latency - int8_latency, 2),
             "ratio_latency_redution": round(
-                (fp32_latency - int8_latency) / int8_latency, 2
+                ((fp32_latency - int8_latency) / fp32_latency)*100, 2
             ),
             "accuracy": {"FP32": round(fp32_acc, 4), "INT8": round(int8_acc, 4)},
             "accuracy_loss": round(fp32_acc - int8_acc, 4),
-            "ratio_accuracy_loss": round(((fp32_acc - int8_acc) / int8_acc) * 100, 4),
+            "ratio_accuracy_loss": round(((fp32_acc - int8_acc) / fp32_acc) * 100, 4),
         }
 
         data_list.append(data)

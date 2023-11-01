@@ -23,7 +23,7 @@ For example, we may choose to quantize 90% of the Conv2D and FC nodes in a ResNe
 
 You can easily install this package by the command
 ```bash
-conda create -n <environment-name> --file requirements.txt
+pip install -r requirements.txt
 ```
 ## Usage
 ### Command-line

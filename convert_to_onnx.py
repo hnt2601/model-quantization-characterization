@@ -24,7 +24,7 @@ def get_args():
     )
 
     parser.add_argument(
-        "--backbone", choices=["resnet50", "mobilenet_v2", "efficientnetv2"]
+        "--backbone", choices=["resnet50", "mobilenetv2", "efficientnetv2"]
     )
 
     args = parser.parse_args()
@@ -37,7 +37,7 @@ if __name__ == "__main__":
 
     model_dict = {
         "resnet50": ResNet50(),
-        "mobilenet_v2": MobileNetV2(),
+        "mobilenetv2": MobileNetV2(),
         "efficientnetv2": EfficientnetV2(),
     }
 
@@ -45,38 +45,40 @@ if __name__ == "__main__":
     model.load_state_dict(torch.load(args.pretrained))
     model.eval()
 
-    print("Finished loading model!")
+    with torch.no_grad():
 
-    # Export to ONNX
-    input_names = ["input1"]
-    output_names = ["output0"]
-    input_shapes = {input_names[0]: [1, 3, *args.input_size]}
-    onnx_bytes = io.BytesIO()
-    zero_input = torch.zeros(*input_shapes[input_names[0]])
+        print("Finished loading model!")
 
-    dynamic_axes = {input_names[0]: {0: "batch"}}
-    for _, name in enumerate(output_names):
-        dynamic_axes[name] = dynamic_axes[input_names[0]]
+        # Export to ONNX
+        input_names = ["input1"]
+        output_names = ["output0"]
+        input_shapes = {input_names[0]: [1, 3, *args.input_size]}
+        onnx_bytes = io.BytesIO()
+        zero_input = torch.zeros(*input_shapes[input_names[0]])
 
-    extra_args = {
-        "opset_version": 13,
-        "verbose": False,
-        "input_names": input_names,
-        "output_names": output_names,
-        "dynamic_axes": dynamic_axes,
-        "do_constant_folding": False,
-        "export_params": True,
-    }
+        dynamic_axes = {input_names[0]: {0: "batch"}}
+        for _, name in enumerate(output_names):
+            dynamic_axes[name] = dynamic_axes[input_names[0]]
 
-    onnx_path = args.pretrained.replace(".pth", ".onnx")
+        extra_args = {
+            "opset_version": 13,
+            "verbose": False,
+            "input_names": input_names,
+            "output_names": output_names,
+            "dynamic_axes": dynamic_axes,
+            "do_constant_folding": True,
+            "export_params": True,
+        }
 
-    torch.onnx.export(model, zero_input, onnx_bytes, **extra_args)
-    with open(onnx_path, "wb") as out:
-        out.write(onnx_bytes.getvalue())
+        onnx_path = args.pretrained.replace(".pth", ".onnx")
 
-    onnx_model = onnx.load(onnx_path)
-    inferred_model = onnx.shape_inference.infer_shapes(onnx_model)
-    # print(onnx.helper.printable_graph(inferred_model.graph))
-    onnx.save(inferred_model, onnx_path)
+        torch.onnx.export(model, zero_input, onnx_bytes, **extra_args)
+        with open(onnx_path, "wb") as out:
+            out.write(onnx_bytes.getvalue())
 
-    print("Generated onnx model named {}".format(onnx_path))
+        onnx_model = onnx.load(onnx_path)
+        inferred_model = onnx.shape_inference.infer_shapes(onnx_model)
+        # print(onnx.helper.printable_graph(inferred_model.graph))
+        onnx.save(inferred_model, onnx_path)
+
+        print("Generated onnx model named {}".format(onnx_path))

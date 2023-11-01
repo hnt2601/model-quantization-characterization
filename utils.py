@@ -8,6 +8,24 @@ from openpyxl.utils import column_index_from_string
 from openpyxl.styles import Alignment
 
 
+class EarlyStopper:
+    def __init__(self, patience=1, min_delta=0):
+        self.patience = patience
+        self.min_delta = min_delta
+        self.counter = 0
+        self.min_validation_loss = float('inf')
+
+    def early_stop(self, validation_loss):
+        if validation_loss < self.min_validation_loss:
+            self.min_validation_loss = validation_loss
+            self.counter = 0
+        elif validation_loss > (self.min_validation_loss + self.min_delta):
+            self.counter += 1
+            if self.counter >= self.patience:
+                return True
+        return False
+
+
 # @profile
 def benchmark(model_path, batch_size=1, use_gpu=True, is_profile=False):
     # Create an ONNX Runtime session with GPU as the execution provider
