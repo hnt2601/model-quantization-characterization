@@ -1,5 +1,6 @@
 import torch
 import time
+import pynvml
 import numpy as np
 import onnxruntime
 
@@ -13,7 +14,7 @@ class EarlyStopper:
         self.patience = patience
         self.min_delta = min_delta
         self.counter = 0
-        self.min_validation_loss = float('inf')
+        self.min_validation_loss = float("inf")
 
     def early_stop(self, validation_loss):
         if validation_loss < self.min_validation_loss:
@@ -213,6 +214,24 @@ def extract_analytic_to_excel(workbook, data, title):
     worksheet["I1"] = "Ratio Accuracy Loss (%)"
     worksheet.merge_cells("I1:I2")
 
+    worksheet["J1"] = "Number of QuantizeLinear"
+    worksheet.merge_cells("J1:J2")
+
+    worksheet["K1"] = "Number of DequantizeLinear"
+    worksheet.merge_cells("K1:K2")
+
+    worksheet["L1"] = "Number of Weight Non-Quantize"
+    worksheet.merge_cells("L1:L2")
+
+    worksheet["M1"] = "Number of Weight Quantize"
+    worksheet.merge_cells("M1:M2")
+
+    worksheet["N1"] = "First Weight Quantize"
+    worksheet.merge_cells("N1:N2")
+
+    worksheet["O1"] = "Last Weight Quantize"
+    worksheet.merge_cells("O1:O2")
+
     row_index = 3
 
     for i, d in enumerate(data):
@@ -259,9 +278,61 @@ def extract_analytic_to_excel(workbook, data, title):
             column=column_index_from_string("I"),
             value=d["ratio_accuracy_loss"],
         )
+        worksheet.cell(
+            row=row_index,
+            column=column_index_from_string("J"),
+            value=d["nb_qlinear"],
+        )
+        worksheet.cell(
+            row=row_index,
+            column=column_index_from_string("K"),
+            value=d["nb_dqlinear"],
+        )
+        worksheet.cell(
+            row=row_index,
+            column=column_index_from_string("L"),
+            value=d["nb_weight_non_quantized"],
+        )
+        worksheet.cell(
+            row=row_index,
+            column=column_index_from_string("M"),
+            value=d["nb_weight_quantized"],
+        )
+        worksheet.cell(
+            row=row_index,
+            column=column_index_from_string("N"),
+            value=d["nb_first_quantized"],
+        )
+        worksheet.cell(
+            row=row_index,
+            column=column_index_from_string("O"),
+            value=d["nb_last_quantized"],
+        )
 
         row_index += 1
 
-    for row in worksheet.iter_rows(min_row=1, max_row=row_index, min_col=1, max_col=10):
+    for row in worksheet.iter_rows(
+        min_row=1, max_row=row_index, min_col=1, max_col=100
+    ):
         for cell in row:
             cell.alignment = alignment
+
+
+def measure_power_usage():
+    pynvml.nvmlInit()
+    device_count = pynvml.nvmlDeviceGetCount()
+    power_usage = [0] * device_count
+
+    for i in range(device_count):
+        handle = pynvml.nvmlDeviceGetHandleByIndex(i)
+        power_usage[i] = (
+            pynvml.nvmlDeviceGetPowerUsage(handle) / 1000
+        )  # Convert to watts
+
+    return power_usage
+
+
+def estimate_energy_consumption(power_usage, inference_duration_seconds):
+    energy_consumption = power_usage * inference_duration_seconds
+
+    return energy_consumption

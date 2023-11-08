@@ -33,7 +33,7 @@ data_path = "/media/data/hoangnt/Projects/Datasets"
 mean = (0.4914, 0.4822, 0.4465)
 std = (0.2023, 0.1994, 0.2010)
 
-batch_size = 256
+batch_size = 64
 
 transform_train = transforms.Compose(
     [
@@ -78,7 +78,7 @@ test_loader = torch.utils.data.DataLoader(
 # Define a Network
 model = MobileNetV2(class_num=len(classes), pretrained=True)
 # model = EfficientnetV2(class_num=len(classes), pretrained=True)
-#model = ResNet50(class_num=len(classes), pretrained=True)
+# model = ResNet50(class_num=len(classes), pretrained=True)
 model.to(device)
 
 # Training Hyperparameters
@@ -135,7 +135,7 @@ def test(best_auc, loss_test_epoch, epoch_auc_history):
 
     if correct > best_auc:
         best_auc = correct
-        torch.save(model.state_dict(), f"pretrained/{model.name}.pth")
+        torch.save(model.state_dict(), f"pretrained/{model.name}/{model.name}.pth")
 
     print(
         "\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n".format(
@@ -153,7 +153,7 @@ def test(best_auc, loss_test_epoch, epoch_auc_history):
 
 # Training Section
 
-epoches = 200
+epoches = 400
 loss_train_epoch = []
 epoch_auc_history = []
 loss_test_epoch = []

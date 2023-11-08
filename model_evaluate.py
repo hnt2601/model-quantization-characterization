@@ -1,3 +1,4 @@
+import os
 import torch
 import torchvision as tv
 import onnxruntime
@@ -29,14 +30,16 @@ def accuracy(true_labels, predicted_labels):
 
 
 def evaluate(test_set, model_path, batch_size=1):
+    seed = torch.initial_seed() % 2**32
     g = torch.Generator()
-    g.manual_seed(2147483647)
+    g.manual_seed(seed)
 
     test_loader = DataLoader(
         test_set,
         batch_size=batch_size,
         shuffle=True,
         drop_last=True,
+        num_workers=os.cpu_count(),
         worker_init_fn=seed_worker,
         generator=g,
     )
@@ -96,14 +99,8 @@ def evaluate(test_set, model_path, batch_size=1):
 
 
 if __name__ == "__main__":
-    import os
-    import onnx
-
-    # os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-
     data_path = "/media/data/hoangnt/Projects/Datasets"
-    int8_model_path = "pretrained/efficientnetv2_rw_t_quant_0.onnx"
-    int8_model = onnx.load(int8_model_path)
+    model_path = "pretrained/mobilenetv2/mobilenetv2.onnx"
     batch_size = 1024
 
     transform = tv.transforms.Compose(
@@ -118,12 +115,12 @@ if __name__ == "__main__":
     )
 
     i = 0
-    while i < 2:
-        g = torch.Generator()
-        g.manual_seed(2147483647)
+    while i < 1:
+        accuracy = evaluate(dataset, model_path, batch_size)
 
-        int8_acc = evaluate(dataset, int8_model_path, batch_size)
-
-        print(int8_acc)
+        print(round(accuracy, 4))
 
         i += 1
+
+# 19a: 0.8212
+# 19: 0.8216

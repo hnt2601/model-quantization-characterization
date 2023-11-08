@@ -46,7 +46,6 @@ if __name__ == "__main__":
     model.eval()
 
     with torch.no_grad():
-
         print("Finished loading model!")
 
         # Export to ONNX

@@ -44,7 +44,7 @@ python generate_combination_layers.py --onnx_path path/to/file
 
 Model quantization and statistical analysis
 ```bash
-python onnx_quantization.py --static --input_model /path/to/file --config_path /path/to/file --data_path /path/to/file --report_path /path/to/file --profiling
+python onnx_quantization.py --static --input_model /path/to/file --config_path /path/to/file --data_path /path/to/file --report_path /path/to/file --profiling --benchmark
 ```
 
 ## TODO

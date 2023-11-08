@@ -11,9 +11,7 @@ class EfficientnetV2(nn.Module):
         self.name = "efficientnetv2_rw_t"
 
         # load model #####################################
-        self.model = timm.create_model(
-            self.name, pretrained=self.pretrained
-        )
+        self.model = timm.create_model(self.name, pretrained=self.pretrained)
 
         # set last layer ################################
         if self.model.classifier.out_features != self.class_num:
@@ -33,14 +31,16 @@ class MobileNetV2(nn.Module):
         super(MobileNetV2, self).__init__()
         self.class_num = class_num
         self.pretrained = pretrained
-        self.name = "mobilenetv2_100"
+        self.name = "mobilenetv2"
 
         # load model #####################################
-        self.model = timm.create_model(self.name, pretrained=self.pretrained)
+        self.model = torch.hub.load(
+            "pytorch/vision:v0.10.0", "mobilenet_v2", pretrained=self.pretrained
+        )
 
         # set last layer ################################
-        if self.model.classifier.out_features != self.class_num:
-            self.model.classifier = nn.Linear(1280, self.class_num)
+        if self.model.classifier[1].out_features != self.class_num:
+            self.model.classifier[1] = nn.Linear(1280, self.class_num)
 
         # # Normal initialization #########################
         # for params, a in self.model.named_parameters():
