@@ -132,7 +132,7 @@ def main():
     ratio_quantized = int(args.config_path.split(".")[0].split("_")[-1])
     nb_index_per_proc = len(quantize_config) // args.proc
     start_index = 0
-    end_index = 100  # start_index + nb_index_per_proc
+    end_index = 500  # start_index + nb_index_per_proc
 
     input_path = pathlib.Path(args.input_model)
 

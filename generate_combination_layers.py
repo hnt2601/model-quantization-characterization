@@ -128,22 +128,25 @@ if __name__ == "__main__":
                 if init["name"] == node_name
             ][0]
             init_indexes.append(index_of_init)
-
-        increasing_sub_indexes = split_increasing_sublists(init_indexes)
+        # print(init_indexes)
+        increasing_sub_indexes = split_increasing_sublists(init_indexes) if not args.only_weight else [init_indexes]
         # print(increasing_sub_indexes)
+
+        configurations = []
 
         for sub_indexes in increasing_sub_indexes:
             graph_indexes = [
                 initializer_indexes[ind]["graph_index"] for ind in sub_indexes
             ]
+            # print(graph_indexes)
             if not args.only_weight:
                 graph_indexes = complete_ascending_list(graph_indexes)
             corresponding_node_names = [graph_node_names[ind] for ind in graph_indexes]
             # print(graph_indexes)
-            # print(len((corresponding_node_names)))
+            # print(corresponding_node_names)
+            configurations.extend(corresponding_node_names)
 
-            full_configurations.append(corresponding_node_names)
-
+        full_configurations.append(configurations)
         # print("\n\n\n")
 
         i += 1
