@@ -1,4 +1,5 @@
 import os
+import time
 import torch
 import torchvision as tv
 import onnxruntime
@@ -8,6 +9,7 @@ import random
 from tqdm import tqdm
 from torch.utils.data import DataLoader
 from common import MEAN, STD
+from power import PowerConsumption
 
 
 def seed_worker(worker_id):
@@ -30,6 +32,8 @@ def accuracy(true_labels, predicted_labels):
 
 
 def evaluate(test_set, model_path, batch_size=1):
+    comsp = PowerConsumption(device_id=0)
+
     seed = torch.initial_seed() % 2**32
     g = torch.Generator()
     g.manual_seed(seed)
@@ -49,16 +53,22 @@ def evaluate(test_set, model_path, batch_size=1):
     ort_inputs = {}
     true_labels = []
     predicted_labels = []
+    run_time = []
 
     # Create an ONNX Runtime session with GPU as the execution provider
     options = onnxruntime.SessionOptions()
     options.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
     # options.log_severity_level = 3  # Set log verbosity to see GPU provider details
+    t0 = time.time()
+
     sess = onnxruntime.InferenceSession(
         model_path,
         providers=["CUDAExecutionProvider", "CPUExecutionProvider"],
         sess_options=options,
     )
+
+    duration = time.time() - t0
+    comsp.measure_power_usage(duration) # First measure for model loading
 
     # Check the input and output names and shapes of the model
     input_name = sess.get_inputs()[0].name
@@ -68,14 +78,20 @@ def evaluate(test_set, model_path, batch_size=1):
     # print(f"Input name: {input_name}, Input shape: {input_shape}")
     # print(f"Output name: {output_name}, Output shape: {output_shape}")
 
+
     for inputs, labels in test_loader:
         try:
             inp_list = [inp.numpy() for inp in inputs]
             inps = np.stack(inp_list, axis=0)
 
             ort_inputs.update({input_name: inps})
-
+            
+            t0 = time.time()
+            
             predictions = sess.run(None, ort_inputs)[0]
+            
+            duration = time.time() - t0
+            comsp.measure_power_usage(duration)
 
             for i in range(0, batch_size):
                 pred_label = np.argmax(predictions[i], axis=0)
@@ -91,11 +107,14 @@ def evaluate(test_set, model_path, batch_size=1):
 
     pbar.close()
 
+    power, energy = comsp.get_consumption()
+
     acc = accuracy(true_labels, predicted_labels)
 
     del sess
+    del comsp
 
-    return acc
+    return acc, power, energy
 
 
 if __name__ == "__main__":

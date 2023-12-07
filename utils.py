@@ -1,6 +1,5 @@
 import torch
 import time
-import pynvml
 import numpy as np
 import onnxruntime
 
@@ -232,6 +231,20 @@ def extract_analytic_to_excel(workbook, data, title):
     worksheet["O1"] = "Last Weight Quantize"
     worksheet.merge_cells("O1:O2")
 
+    worksheet["P1"] = ""
+    worksheet["Q1"] = ""
+    worksheet.merge_cells("P1:Q1")
+    worksheet["P1"] = "Power (W)"
+    worksheet["P2"] = "FP32 Power (W)"
+    worksheet["Q2"] = "INT8 Power (W)"
+
+    worksheet["R1"] = ""
+    worksheet["S1"] = ""
+    worksheet.merge_cells("R1:S1")
+    worksheet["R1"] = "Energy (W)"
+    worksheet["R2"] = "FP32 Energy (W/s)"
+    worksheet["S2"] = "INT8 Energy (W/s)"
+
     row_index = 3
 
     for i, d in enumerate(data):
@@ -308,6 +321,26 @@ def extract_analytic_to_excel(workbook, data, title):
             column=column_index_from_string("O"),
             value=d["nb_last_quantized"],
         )
+        worksheet.cell(
+            row=row_index,
+            column=column_index_from_string("P"),
+            value=d["power"]["FP32"],
+        )
+        worksheet.cell(
+            row=row_index,
+            column=column_index_from_string("Q"),
+            value=d["power"]["INT8"],
+        )
+        worksheet.cell(
+            row=row_index,
+            column=column_index_from_string("R"),
+            value=d["energy"]["FP32"],
+        )
+        worksheet.cell(
+            row=row_index,
+            column=column_index_from_string("S"),
+            value=d["energy"]["INT8"],
+        )
 
         row_index += 1
 
@@ -316,23 +349,3 @@ def extract_analytic_to_excel(workbook, data, title):
     ):
         for cell in row:
             cell.alignment = alignment
-
-
-def measure_power_usage():
-    pynvml.nvmlInit()
-    device_count = pynvml.nvmlDeviceGetCount()
-    power_usage = [0] * device_count
-
-    for i in range(device_count):
-        handle = pynvml.nvmlDeviceGetHandleByIndex(i)
-        power_usage[i] = (
-            pynvml.nvmlDeviceGetPowerUsage(handle) / 1000
-        )  # Convert to watts
-
-    return power_usage
-
-
-def estimate_energy_consumption(power_usage, inference_duration_seconds):
-    energy_consumption = power_usage * inference_duration_seconds
-
-    return energy_consumption
